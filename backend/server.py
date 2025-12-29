@@ -368,6 +368,8 @@ async def create_member(member_data: MemberCreate, admin: dict = Depends(get_cur
         if isinstance(value, datetime):
             doc[key] = value.isoformat()
     await db.members.insert_one(doc)
+    # Remove _id added by MongoDB before returning
+    doc.pop('_id', None)
     return {"member": doc, "message": "Member created successfully"}
 
 @api_router.put("/admin/members/{member_id}")
