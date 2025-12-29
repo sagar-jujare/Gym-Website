@@ -344,14 +344,14 @@ export default function AdminMembers() {
               <div>
                 <Label className="text-zinc-400 text-xs uppercase">Trainer (Optional)</Label>
                 <Select
-                  value={formData.trainer_id}
-                  onValueChange={(value) => setFormData({...formData, trainer_id: value})}
+                  value={formData.trainer_id || 'none'}
+                  onValueChange={(value) => setFormData({...formData, trainer_id: value === 'none' ? '' : value})}
                 >
                   <SelectTrigger className="mt-1 bg-zinc-800 border-zinc-700 text-white rounded-sm" data-testid="member-form-trainer">
                     <SelectValue placeholder="Select trainer" />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
-                    <SelectItem value="" className="text-white">No Trainer</SelectItem>
+                    <SelectItem value="none" className="text-white">No Trainer</SelectItem>
                     {trainers.map(trainer => (
                       <SelectItem key={trainer.id} value={trainer.id} className="text-white">
                         {trainer.name}
