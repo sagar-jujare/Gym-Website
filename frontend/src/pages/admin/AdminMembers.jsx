@@ -86,12 +86,28 @@ export default function AdminMembers() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.membership_plan_id) {
+      toast.error('Please select a membership plan');
+      return;
+    }
+    
     try {
       const payload = {
-        ...formData,
+        full_name: formData.full_name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        membership_plan_id: formData.membership_plan_id,
         membership_start_date: new Date(formData.membership_start_date).toISOString(),
-        trainer_id: formData.trainer_id || null
+        trainer_id: (formData.trainer_id && formData.trainer_id !== 'none') ? formData.trainer_id : null
       };
+      
+      // Add status for updates
+      if (editingMember && formData.status) {
+        payload.status = formData.status;
+      }
 
       if (editingMember) {
         await axios.put(
