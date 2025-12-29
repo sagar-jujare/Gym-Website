@@ -29,7 +29,7 @@ db = client[os.environ['DB_NAME']]
 # JWT Settings
 JWT_SECRET = os.environ.get('JWT_SECRET', 'gym-admin-secret-key-2024')
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
+JWT_EXPIRATION_HOURS = 72  # Extended to 72 hours for better user experience
 
 # Cashfree Settings
 CASHFREE_CLIENT_ID = os.environ.get('CASHFREE_CLIENT_ID', '')
