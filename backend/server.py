@@ -24,9 +24,24 @@ load_dotenv(ROOT_DIR / '.env')
 # Neon.tech PostgreSQL Connection
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Validate DATABASE_URL
+if not DATABASE_URL or "xxxxx" in DATABASE_URL or not DATABASE_URL.startswith(('postgresql://', 'postgres://')):
+    logger.error("=" * 60)
+    logger.error("DATABASE_URL is not configured properly!")
+    logger.error("Please update /app/backend/.env with your Neon.tech connection string:")
+    logger.error('DATABASE_URL="postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"')
+    logger.error("=" * 60)
+    raise ValueError("DATABASE_URL must be configured with a valid Neon.tech PostgreSQL connection string")
+
 # For Neon.tech, we need to handle the connection string format
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+logger.info(f"Connecting to database: {DATABASE_URL.split('@')[1].split('/')[0] if '@' in DATABASE_URL else 'unknown'}...")
 
 # Create SQLAlchemy engine with SSL for Neon.tech
 engine = create_engine(
