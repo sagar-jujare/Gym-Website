@@ -64,10 +64,6 @@ CASHFREE_CLIENT_SECRET = os.environ.get('CASHFREE_CLIENT_SECRET', '')
 CASHFREE_ENVIRONMENT = os.environ.get('CASHFREE_ENVIRONMENT', 'SANDBOX')
 CASHFREE_API_URL = "https://sandbox.cashfree.com/pg" if CASHFREE_ENVIRONMENT == "SANDBOX" else "https://api.cashfree.com/pg"
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
 # ===================== DATABASE MODELS (SQLAlchemy) =====================
 
 class AdminModel(Base):
