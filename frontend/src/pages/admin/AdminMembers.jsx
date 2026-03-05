@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Edit, Trash2, Loader2, UserCheck, UserX, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, UserCheck, UserX, MessageCircle, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -11,6 +11,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const GYM_NAME = "Iron & Neon Gym";
 
 const getAuthHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('adminToken')}`
@@ -23,6 +24,8 @@ export default function AdminMembers() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
+  const [selectedMemberForRenewal, setSelectedMemberForRenewal] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -32,6 +35,11 @@ export default function AdminMembers() {
     membership_plan_id: '',
     membership_start_date: new Date().toISOString().split('T')[0],
     trainer_id: ''
+  });
+  const [renewFormData, setRenewFormData] = useState({
+    duration_months: 1,
+    amount: 1999,
+    payment_method: 'CASH'
   });
 
   useEffect(() => {
@@ -144,6 +152,77 @@ export default function AdminMembers() {
     }
   };
 
+  // Open renewal dialog for inactive/expired members
+  const handleOpenRenewDialog = (member) => {
+    setSelectedMemberForRenewal(member);
+    setRenewFormData({
+      duration_months: 1,
+      amount: 1999,
+      payment_method: 'CASH'
+    });
+    setRenewDialogOpen(true);
+  };
+
+  // Handle membership renewal
+  const handleRenewMembership = async (e) => {
+    e.preventDefault();
+    if (!selectedMemberForRenewal) return;
+
+    try {
+      await axios.post(
+        `${API}/admin/members/renew`,
+        {
+          member_id: selectedMemberForRenewal.id,
+          duration_months: parseInt(renewFormData.duration_months),
+          amount: parseFloat(renewFormData.amount),
+          payment_method: renewFormData.payment_method
+        },
+        { headers: getAuthHeaders() }
+      );
+      toast.success(`Membership renewed for ${renewFormData.duration_months} month(s)`);
+      setRenewDialogOpen(false);
+      setSelectedMemberForRenewal(null);
+      fetchData();
+    } catch (error) {
+      console.error('Error renewing membership:', error);
+      toast.error(error.response?.data?.detail || 'Failed to renew membership');
+    }
+  };
+
+  // Open WhatsApp chat with prefilled message
+  const handleChatWithMember = (member) => {
+    const expiryDate = new Date(member.membership_expiry_date).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    
+    const isExpired = new Date(member.membership_expiry_date) < new Date();
+    
+    let message;
+    if (isExpired) {
+      message = `Hi ${member.full_name},\n\nThis is a reminder from ${GYM_NAME}.\n\nYour gym membership expired on ${expiryDate}.\n\nWe would love to have you back! Please visit us or reply to this message to renew your membership and continue your fitness journey.\n\nThank you,\n${GYM_NAME} Team`;
+    } else {
+      message = `Hi ${member.full_name},\n\nThis is a reminder from ${GYM_NAME}.\n\nYour gym membership is expiring on ${expiryDate}.\n\nPlease renew your membership before the expiry date to continue enjoying our facilities without interruption.\n\nThank you,\n${GYM_NAME} Team`;
+    }
+    
+    // Format phone number (remove spaces, dashes, and ensure it starts with country code)
+    let phone = member.phone.replace(/[\s-]/g, '');
+    if (!phone.startsWith('+')) {
+      // Assume Indian number if no country code
+      if (phone.startsWith('0')) {
+        phone = '91' + phone.substring(1);
+      } else if (!phone.startsWith('91')) {
+        phone = '91' + phone;
+      }
+    } else {
+      phone = phone.substring(1); // Remove the + for WhatsApp URL
+    }
+    
+    const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const filteredMembers = members.filter(member =>
     member.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -153,13 +232,24 @@ export default function AdminMembers() {
   const getPlanName = (planId) => plans.find(p => p.id === planId)?.name || 'Unknown';
   const getTrainerName = (trainerId) => trainers.find(t => t.id === trainerId)?.name || '-';
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, expiryDate) => {
+    // Check if membership is expired
+    const isExpired = new Date(expiryDate) < new Date();
+    const displayStatus = isExpired ? 'Inactive' : status;
+    
     const variants = {
       Active: 'bg-green-500/10 text-green-500 border-green-500/20',
+      Inactive: 'bg-red-500/10 text-red-500 border-red-500/20',
       Expired: 'bg-red-500/10 text-red-500 border-red-500/20',
       Suspended: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
     };
-    return variants[status] || variants.Active;
+    return { className: variants[displayStatus] || variants.Inactive, status: displayStatus };
+  };
+
+  const isExpiredOrInactive = (member) => {
+    return new Date(member.membership_expiry_date) < new Date() || 
+           member.status === 'Inactive' || 
+           member.status === 'Expired';
   };
 
   if (loading) {
@@ -215,58 +305,96 @@ export default function AdminMembers() {
           </TableHeader>
           <TableBody>
             {filteredMembers.length > 0 ? (
-              filteredMembers.map((member) => (
-                <TableRow 
-                  key={member.id} 
-                  className="border-zinc-800 table-row-hover"
-                  data-testid={`member-row-${member.id}`}
-                >
-                  <TableCell>
-                    <div>
-                      <p className="text-white font-medium">{member.full_name}</p>
-                      <p className="text-zinc-500 text-xs">Trainer: {getTrainerName(member.trainer_id)}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <p className="text-zinc-300 text-sm">{member.email}</p>
-                    <p className="text-zinc-500 text-xs">{member.phone}</p>
-                  </TableCell>
-                  <TableCell className="text-zinc-300">{getPlanName(member.membership_plan_id)}</TableCell>
-                  <TableCell className="text-zinc-400 text-sm font-mono">
-                    {new Date(member.membership_expiry_date).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${getStatusBadge(member.status)} border rounded-sm`}>
-                      {member.status === 'Active' ? (
-                        <UserCheck className="w-3 h-3 mr-1" />
-                      ) : (
-                        <UserX className="w-3 h-3 mr-1" />
-                      )}
-                      {member.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenDialog(member)}
-                      className="text-zinc-400 hover:text-white"
-                      data-testid={`edit-member-${member.id}`}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(member.id)}
-                      className="text-zinc-400 hover:text-red-500"
-                      data-testid={`delete-member-${member.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredMembers.map((member) => {
+                const statusInfo = getStatusBadge(member.status, member.membership_expiry_date);
+                const showRenewButton = isExpiredOrInactive(member);
+                
+                return (
+                  <TableRow 
+                    key={member.id} 
+                    className="border-zinc-800 table-row-hover"
+                    data-testid={`member-row-${member.id}`}
+                  >
+                    <TableCell>
+                      <div>
+                        <p className="text-white font-medium">{member.full_name}</p>
+                        <p className="text-zinc-500 text-xs">Trainer: {member.trainer_name || getTrainerName(member.trainer_id)}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-zinc-300 text-sm">{member.email}</p>
+                      <p className="text-zinc-500 text-xs">{member.phone}</p>
+                    </TableCell>
+                    <TableCell className="text-zinc-300">{getPlanName(member.membership_plan_id)}</TableCell>
+                    <TableCell className="text-zinc-400 text-sm font-mono">
+                      {new Date(member.membership_expiry_date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${statusInfo.className} border rounded-sm`}>
+                        {statusInfo.status === 'Active' ? (
+                          <UserCheck className="w-3 h-3 mr-1" />
+                        ) : (
+                          <UserX className="w-3 h-3 mr-1" />
+                        )}
+                        {statusInfo.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Chat Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleChatWithMember(member)}
+                          className="text-green-500 hover:text-green-400 hover:bg-green-500/10"
+                          data-testid={`chat-member-${member.id}`}
+                          title="Chat on WhatsApp"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </Button>
+                        
+                        {/* Renew Button (only for expired/inactive) */}
+                        {showRenewButton && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenRenewDialog(member)}
+                            className="text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
+                            data-testid={`renew-member-${member.id}`}
+                            title="Renew Membership"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </Button>
+                        )}
+                        
+                        {/* Edit Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenDialog(member)}
+                          className="text-zinc-400 hover:text-white"
+                          data-testid={`edit-member-${member.id}`}
+                          title="Edit Member"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        
+                        {/* Delete Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(member.id)}
+                          className="text-zinc-400 hover:text-red-500"
+                          data-testid={`delete-member-${member.id}`}
+                          title="Delete Member"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12 text-zinc-500">
@@ -278,7 +406,7 @@ export default function AdminMembers() {
         </Table>
       </div>
 
-      {/* Add/Edit Dialog */}
+      {/* Add/Edit Member Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-lg">
           <DialogHeader>
@@ -388,7 +516,7 @@ export default function AdminMembers() {
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-800 border-zinc-700">
                       <SelectItem value="Active" className="text-white">Active</SelectItem>
-                      <SelectItem value="Expired" className="text-white">Expired</SelectItem>
+                      <SelectItem value="Inactive" className="text-white">Inactive</SelectItem>
                       <SelectItem value="Suspended" className="text-white">Suspended</SelectItem>
                     </SelectContent>
                   </Select>
@@ -413,6 +541,100 @@ export default function AdminMembers() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Renew Membership Dialog */}
+      <Dialog open={renewDialogOpen} onOpenChange={setRenewDialogOpen}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-2xl">
+              RENEW MEMBERSHIP
+            </DialogTitle>
+          </DialogHeader>
+          {selectedMemberForRenewal && (
+            <div className="mt-4">
+              <div className="bg-zinc-800 rounded-sm p-4 mb-4">
+                <p className="text-white font-medium">{selectedMemberForRenewal.full_name}</p>
+                <p className="text-zinc-500 text-sm">{selectedMemberForRenewal.email}</p>
+                <p className="text-red-500 text-sm mt-2">
+                  Expired: {new Date(selectedMemberForRenewal.membership_expiry_date).toLocaleDateString()}
+                </p>
+              </div>
+              
+              <form onSubmit={handleRenewMembership} className="space-y-4">
+                <div>
+                  <Label className="text-zinc-400 text-xs uppercase">Duration</Label>
+                  <Select
+                    value={renewFormData.duration_months.toString()}
+                    onValueChange={(value) => {
+                      const months = parseInt(value);
+                      let amount = 1999;
+                      if (months === 3) amount = 4999;
+                      if (months === 12) amount = 14999;
+                      setRenewFormData({...renewFormData, duration_months: months, amount});
+                    }}
+                  >
+                    <SelectTrigger className="mt-1 bg-zinc-800 border-zinc-700 text-white rounded-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-800 border-zinc-700">
+                      <SelectItem value="1" className="text-white">1 Month - ₹1,999</SelectItem>
+                      <SelectItem value="3" className="text-white">3 Months - ₹4,999</SelectItem>
+                      <SelectItem value="12" className="text-white">12 Months - ₹14,999</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label className="text-zinc-400 text-xs uppercase">Amount (₹)</Label>
+                  <Input
+                    type="number"
+                    value={renewFormData.amount}
+                    onChange={(e) => setRenewFormData({...renewFormData, amount: e.target.value})}
+                    className="mt-1 bg-zinc-800 border-zinc-700 text-white rounded-sm"
+                  />
+                </div>
+                
+                <div>
+                  <Label className="text-zinc-400 text-xs uppercase">Payment Method</Label>
+                  <Select
+                    value={renewFormData.payment_method}
+                    onValueChange={(value) => setRenewFormData({...renewFormData, payment_method: value})}
+                  >
+                    <SelectTrigger className="mt-1 bg-zinc-800 border-zinc-700 text-white rounded-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-800 border-zinc-700">
+                      <SelectItem value="CASH" className="text-white">Cash</SelectItem>
+                      <SelectItem value="CARD" className="text-white">Card</SelectItem>
+                      <SelectItem value="UPI" className="text-white">UPI</SelectItem>
+                      <SelectItem value="NET_BANKING" className="text-white">Net Banking</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setRenewDialogOpen(false)}
+                    className="flex-1 border-zinc-700 text-zinc-400 hover:bg-zinc-800 rounded-sm"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-sm"
+                    data-testid="renew-form-submit"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Renew & Record Payment
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
