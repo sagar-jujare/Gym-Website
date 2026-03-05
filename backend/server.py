@@ -403,10 +403,35 @@ def get_current_admin_info(admin: AdminModel = Depends(get_current_admin)):
 
 # ===================== ADMIN MEMBER ROUTES =====================
 
+def update_expired_members(db: Session):
+    """Auto-update status to Inactive for expired memberships"""
+    now = datetime.now(timezone.utc)
+    expired_members = db.query(MemberModel).filter(
+        MemberModel.status == "Active",
+        MemberModel.membership_expiry_date < now
+    ).all()
+    for member in expired_members:
+        member.status = "Inactive"
+    if expired_members:
+        db.commit()
+        logger.info(f"Updated {len(expired_members)} members to Inactive status")
+
 @api_router.get("/admin/members")
 def get_members(admin: AdminModel = Depends(get_current_admin), db: Session = Depends(get_db)):
+    # Auto-update expired members
+    update_expired_members(db)
     members = db.query(MemberModel).all()
-    return {"members": [model_to_dict(m) for m in members]}
+    # Add trainer name for each member
+    result = []
+    for m in members:
+        member_dict = model_to_dict(m)
+        if m.trainer_id:
+            trainer = db.query(TrainerModel).filter(TrainerModel.id == m.trainer_id).first()
+            member_dict['trainer_name'] = trainer.name if trainer else None
+        else:
+            member_dict['trainer_name'] = None
+        result.append(member_dict)
+    return {"members": result}
 
 @api_router.get("/admin/members/{member_id}")
 def get_member(member_id: str, admin: AdminModel = Depends(get_current_admin), db: Session = Depends(get_db)):
