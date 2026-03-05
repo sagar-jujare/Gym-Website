@@ -532,6 +532,59 @@ def record_manual_payment(
     
     return {"payment": model_to_dict(payment), "message": "Payment recorded successfully"}
 
+class RenewMembershipRequest(BaseModel):
+    member_id: str
+    duration_months: int = 1
+    amount: float
+    payment_method: str
+
+@api_router.post("/admin/members/renew")
+def renew_membership(
+    request: RenewMembershipRequest,
+    admin: AdminModel = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Renew membership for 1 month (or specified duration) and record payment"""
+    member = db.query(MemberModel).filter(MemberModel.id == request.member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    
+    now = datetime.now(timezone.utc)
+    
+    # Calculate new start and expiry dates
+    # If expired, start from today; if active, extend from current expiry
+    if member.membership_expiry_date < now:
+        new_start = now
+    else:
+        new_start = member.membership_expiry_date
+    
+    new_expiry = new_start + timedelta(days=request.duration_months * 30)
+    
+    # Update member
+    member.membership_start_date = new_start
+    member.membership_expiry_date = new_expiry
+    member.status = "Active"
+    
+    # Record payment
+    payment = PaymentModel(
+        member_id=request.member_id,
+        order_id=f"RENEW-{uuid.uuid4().hex[:8].upper()}",
+        amount=request.amount,
+        payment_method=request.payment_method,
+        payment_date=now,
+        status="PAID"
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(member)
+    db.refresh(payment)
+    
+    return {
+        "member": model_to_dict(member),
+        "payment": model_to_dict(payment),
+        "message": f"Membership renewed for {request.duration_months} month(s)"
+    }
+
 # ===================== CASHFREE PAYMENT ROUTES =====================
 
 @api_router.post("/payment/create-order")
