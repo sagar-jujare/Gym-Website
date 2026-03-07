@@ -456,6 +456,7 @@ def create_member(member_data: MemberCreate, admin: AdminModel = Depends(get_cur
         full_name=member_data.full_name,
         email=member_data.email,
         phone=member_data.phone,
+        emergency_contact=member_data.emergency_contact,
         address=member_data.address or "",
         membership_plan_id=member_data.membership_plan_id,
         membership_start_date=member_data.membership_start_date,
