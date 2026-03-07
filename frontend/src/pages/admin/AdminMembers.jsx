@@ -109,6 +109,7 @@ export default function AdminMembers() {
         full_name: formData.full_name,
         email: formData.email,
         phone: formData.phone,
+        emergency_contact: formData.emergency_contact || null,
         address: formData.address,
         membership_plan_id: formData.membership_plan_id,
         membership_start_date: new Date(formData.membership_start_date).toISOString(),
