@@ -168,6 +168,7 @@ class MemberCreate(BaseModel):
     full_name: str
     email: EmailStr
     phone: str
+    emergency_contact: Optional[str] = None
     address: Optional[str] = ""
     membership_plan_id: str
     membership_start_date: datetime
@@ -177,6 +178,7 @@ class MemberUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
+    emergency_contact: Optional[str] = None
     address: Optional[str] = None
     membership_plan_id: Optional[str] = None
     membership_start_date: Optional[datetime] = None
