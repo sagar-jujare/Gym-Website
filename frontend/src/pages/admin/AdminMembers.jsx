@@ -31,6 +31,7 @@ export default function AdminMembers() {
     full_name: '',
     email: '',
     phone: '',
+    emergency_contact: '',
     address: '',
     membership_plan_id: '',
     membership_start_date: new Date().toISOString().split('T')[0],
