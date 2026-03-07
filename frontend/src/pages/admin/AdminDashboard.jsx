@@ -74,7 +74,7 @@ export default function AdminDashboard() {
           icon={Users}
           title="Active Members"
           value={stats?.active_members || 0}
-          subtitle={`${stats?.expired_members || 0} expired`}
+          subtitle={`${stats?.inactive_members || 0} inactive`}
           color="green"
         />
         <StatCard
