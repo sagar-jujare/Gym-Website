@@ -724,13 +724,20 @@ async def payment_webhook(request: dict, db: Session = Depends(get_db)):
 def get_dashboard_stats(admin: AdminModel = Depends(get_current_admin), db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
     
+    # Update expired members status
+    update_expired_members(db)
+    
     total_members = db.query(MemberModel).count()
     active_members = db.query(MemberModel).filter(MemberModel.status == "Active").count()
-    expired_members = db.query(MemberModel).filter(MemberModel.status == "Expired").count()
+    inactive_members = db.query(MemberModel).filter(MemberModel.status.in_(["Inactive", "Expired"])).count()
     
-    # Monthly revenue
-    paid_payments = db.query(PaymentModel).filter(PaymentModel.status == "PAID").all()
-    monthly_revenue = sum(p.amount for p in paid_payments)
+    # Current month revenue - calculate based on current month's payments
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    current_month_payments = db.query(PaymentModel).filter(
+        PaymentModel.status == "PAID",
+        PaymentModel.payment_date >= start_of_month
+    ).all()
+    monthly_revenue = sum(p.amount for p in current_month_payments if p.amount)
     
     # Upcoming renewals (next 7 days)
     next_week = now + timedelta(days=7)
@@ -749,12 +756,27 @@ def get_dashboard_stats(admin: AdminModel = Depends(get_current_admin), db: Sess
         payment_dict['member_name'] = member.full_name if member else "Unknown"
         recent_payments_list.append(payment_dict)
     
-    # Revenue by month (last 6 months)
+    # Revenue by month (last 6 months) - actual calculation per month
     revenue_by_month = []
     for i in range(5, -1, -1):
-        month_date = now - timedelta(days=30*i)
-        month_name = month_date.strftime("%b")
-        revenue_by_month.append({"month": month_name, "revenue": monthly_revenue / 6 if i == 0 else monthly_revenue / 8})
+        # Calculate start and end of each month
+        target_date = now - timedelta(days=30*i)
+        month_start = target_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if target_date.month == 12:
+            month_end = month_start.replace(year=target_date.year + 1, month=1)
+        else:
+            month_end = month_start.replace(month=target_date.month + 1)
+        
+        # Get payments for this month
+        month_payments = db.query(PaymentModel).filter(
+            PaymentModel.status == "PAID",
+            PaymentModel.payment_date >= month_start,
+            PaymentModel.payment_date < month_end
+        ).all()
+        
+        month_revenue = sum(p.amount for p in month_payments if p.amount)
+        month_name = month_start.strftime("%b")
+        revenue_by_month.append({"month": month_name, "revenue": month_revenue})
     
     return {
         "total_members": total_members,
