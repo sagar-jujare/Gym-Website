@@ -499,6 +499,10 @@ def delete_member(member_id: str, admin: AdminModel = Depends(get_current_admin)
     member = db.query(MemberModel).filter(MemberModel.id == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
+    
+    # Delete associated payments first (handle foreign key constraint)
+    db.query(PaymentModel).filter(PaymentModel.member_id == member_id).delete()
+    
     db.delete(member)
     db.commit()
     return {"message": "Member deleted successfully"}
