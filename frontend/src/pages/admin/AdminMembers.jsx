@@ -328,6 +328,9 @@ export default function AdminMembers() {
                     <TableCell>
                       <p className="text-zinc-300 text-sm">{member.email}</p>
                       <p className="text-zinc-500 text-xs">{member.phone}</p>
+                      {member.emergency_contact && (
+                        <p className="text-yellow-500 text-xs">Emergency: {member.emergency_contact}</p>
+                      )}
                     </TableCell>
                     <TableCell className="text-zinc-300">{getPlanName(member.membership_plan_id)}</TableCell>
                     <TableCell className="text-zinc-400 text-sm font-mono">
