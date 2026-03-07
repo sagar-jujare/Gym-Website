@@ -106,13 +106,14 @@ class MemberModel(Base):
     full_name = Column(String(200), nullable=False)
     email = Column(String(255), nullable=False, index=True)
     phone = Column(String(20), nullable=False)
+    emergency_contact = Column(String(20), nullable=True)  # Emergency contact number
     address = Column(Text, nullable=True)
     date_of_joining = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     membership_plan_id = Column(String(50), ForeignKey("membership_plans.id"), nullable=False)
     membership_start_date = Column(DateTime(timezone=True), nullable=False)
     membership_expiry_date = Column(DateTime(timezone=True), nullable=False)
     trainer_id = Column(String(36), ForeignKey("trainers.id"), nullable=True)
-    status = Column(String(20), default="Active")  # Active, Expired, Suspended
+    status = Column(String(20), default="Active")  # Active, Inactive, Suspended
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class PaymentModel(Base):
