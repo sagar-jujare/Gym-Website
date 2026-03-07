@@ -826,15 +826,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def run_migrations(db: Session):
+    """Run database migrations for new columns"""
+    try:
+        # Check if emergency_contact column exists
+        result = db.execute(text("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name='members' AND column_name='emergency_contact'
+        """))
+        if not result.fetchone():
+            db.execute(text("ALTER TABLE members ADD COLUMN emergency_contact VARCHAR(20)"))
+            db.commit()
+            logger.info("Added emergency_contact column to members table")
+    except Exception as e:
+        logger.warning(f"Migration check: {str(e)}")
+        db.rollback()
+
 @app.on_event("startup")
 def startup_event():
     # Create tables
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created")
     
-    # Seed initial data
+    # Run migrations
     db = SessionLocal()
     try:
+        run_migrations(db)
         seed_initial_data(db)
     finally:
         db.close()
