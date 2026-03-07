@@ -781,7 +781,7 @@ def get_dashboard_stats(admin: AdminModel = Depends(get_current_admin), db: Sess
     return {
         "total_members": total_members,
         "active_members": active_members,
-        "expired_members": expired_members,
+        "inactive_members": inactive_members,
         "monthly_revenue": monthly_revenue,
         "upcoming_renewals": upcoming_renewals,
         "recent_payments": recent_payments_list,
