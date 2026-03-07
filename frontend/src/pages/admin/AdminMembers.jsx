@@ -454,6 +454,16 @@ export default function AdminMembers() {
                   data-testid="member-form-phone"
                 />
               </div>
+              <div>
+                <Label className="text-zinc-400 text-xs uppercase">Emergency Contact</Label>
+                <Input
+                  value={formData.emergency_contact}
+                  onChange={(e) => setFormData({...formData, emergency_contact: e.target.value})}
+                  placeholder="Emergency phone number"
+                  className="mt-1 bg-zinc-800 border-zinc-700 text-white rounded-sm"
+                  data-testid="member-form-emergency"
+                />
+              </div>
               <div className="col-span-2">
                 <Label className="text-zinc-400 text-xs uppercase">Address</Label>
                 <Input
