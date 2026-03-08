@@ -494,6 +494,18 @@ def update_member(member_id: str, member_data: MemberUpdate, admin: AdminModel =
     
     return {"member": model_to_dict(member), "message": "Member updated successfully"}
 
+# @api_router.delete("/admin/members/{member_id}")
+# def delete_member(member_id: str, admin: AdminModel = Depends(get_current_admin), db: Session = Depends(get_db)):
+#     member = db.query(MemberModel).filter(MemberModel.id == member_id).first()
+#     if not member:
+#         raise HTTPException(status_code=404, detail="Member not found")
+    
+#     # Delete associated payments first (handle foreign key constraint)
+#     db.query(PaymentModel).filter(PaymentModel.member_id == member_id).delete()
+    
+#     db.delete(member)
+#     db.commit()
+#     return {"message": "Member deleted successfully"}
 @api_router.delete("/admin/members/{member_id}")
 def delete_member(member_id: str, admin: AdminModel = Depends(get_current_admin), db: Session = Depends(get_db)):
     member = db.query(MemberModel).filter(MemberModel.id == member_id).first()
